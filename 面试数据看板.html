@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>面试数据看板 · 零元团队</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  :root {
+    --blue:#1456cb; --blue-dark:#0d3d99; --blue-light:#e8f0fe;
+    --bg:#f0f2f7; --surface:#fff; --border:#dde3f0;
+    --text:#1a1f36; --muted:#6b7280;
+    --green:#16a34a; --green-bg:#f0fdf4;
+    --red:#dc2626; --red-bg:#fef2f2;
+    --amber:#d97706; --amber-bg:#fffbeb;
+  }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:-apple-system,"PingFang SC","Helvetica Neue",sans-serif; background:var(--bg); color:var(--text); font-size:14px; min-height:100vh; }
+
+  header { background:var(--blue-dark); padding:0 28px; height:56px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:100; }
+  .logo { display:flex; align-items:center; gap:10px; color:#fff; }
+  .logo-icon { width:30px; height:30px; background:rgba(255,255,255,.15); border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:16px; }
+  .logo-text { font-size:15px; font-weight:700; }
+  .logo-sub { font-size:11px; opacity:.55; margin-left:4px; }
+  .nav-links { display:flex; gap:8px; }
+  .nav-link { color:rgba(255,255,255,.7); font-size:13px; font-weight:500; text-decoration:none; padding:6px 14px; border-radius:6px; transition:all .15s; }
+  .nav-link:hover { background:rgba(255,255,255,.1); color:#fff; }
+  .nav-link.active { background:rgba(255,255,255,.15); color:#fff; }
+
+  .dashboard { max-width:1280px; margin:0 auto; padding:20px 24px; }
+
+  /* filters */
+  .filter-bar { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:16px 20px; margin-bottom:20px; display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap; }
+  .filter-item { display:flex; flex-direction:column; gap:5px; }
+  .filter-item label { font-size:11px; font-weight:600; color:var(--muted); }
+  .filter-item select, .filter-item input[type="date"] { height:36px; border:1px solid var(--border); border-radius:7px; padding:0 10px; font-size:13px; font-family:inherit; color:var(--text); background:#fff; outline:none; min-width:120px; }
+  .filter-item select:focus, .filter-item input:focus { border-color:var(--blue); }
+  .btn-filter { height:36px; padding:0 20px; background:var(--blue); color:#fff; border:none; border-radius:7px; font-size:13px; font-weight:600; cursor:pointer; font-family:inherit; white-space:nowrap; }
+  .btn-filter:hover { background:var(--blue-dark); }
+  .btn-reset-filter { height:36px; padding:0 16px; background:#fff; color:var(--muted); border:1px solid var(--border); border-radius:7px; font-size:13px; cursor:pointer; font-family:inherit; }
+  .btn-reset-filter:hover { border-color:var(--red); color:var(--red); }
+
+  /* stat cards */
+  .stat-grid { display:grid; grid-template-columns:repeat(5,1fr); gap:14px; margin-bottom:20px; }
+  .stat-card { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:16px 18px; }
+  .stat-card .num { font-size:28px; font-weight:800; color:var(--blue); line-height:1; margin-bottom:4px; }
+  .stat-card .lbl { font-size:12px; color:var(--muted); }
+  .stat-card.green .num { color:var(--green); }
+  .stat-card.red .num { color:var(--red); }
+  .stat-card.amber .num { color:var(--amber); }
+
+  /* charts row */
+  .chart-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px; margin-bottom:20px; }
+  .chart-card { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:16px 18px; }
+  .chart-card.wide { grid-column:span 2; }
+  .chart-title { font-size:13px; font-weight:700; color:var(--text); margin-bottom:14px; display:flex; align-items:center; gap:6px; }
+  .chart-title::before { content:''; display:inline-block; width:3px; height:13px; background:var(--blue); border-radius:2px; }
+  .chart-wrap { position:relative; height:200px; }
+
+  /* table */
+  .table-card { background:var(--surface); border:1px solid var(--border); border-radius:10px; overflow:hidden; margin-bottom:20px; }
+  .table-header { padding:14px 18px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; }
+  .table-title { font-size:13px; font-weight:700; color:var(--text); display:flex; align-items:center; gap:6px; }
+  .table-title::before { content:''; display:inline-block; width:3px; height:13px; background:var(--blue); border-radius:2px; }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th { background:#fafbff; color:var(--muted); padding:10px 14px; text-align:left; font-weight:600; font-size:12px; border-bottom:1px solid var(--border); cursor:pointer; white-space:nowrap; }
+  th:hover { color:var(--blue); }
+  td { padding:10px 14px; border-bottom:1px solid #f5f6f8; vertical-align:middle; }
+  tr:last-child td { border-bottom:none; }
+  tr:hover td { background:#fafbff; }
+  .badge { display:inline-block; padding:2px 9px; border-radius:12px; font-size:11px; font-weight:700; }
+  .badge.pass { background:var(--green-bg); color:var(--green); }
+  .badge.fail { background:var(--red-bg); color:var(--red); }
+  .badge.warn { background:var(--amber-bg); color:var(--amber); }
+  .badge.info { background:var(--blue-light); color:var(--blue); }
+  .btn-detail { padding:3px 10px; border:1px solid var(--border); border-radius:5px; background:#fff; font-size:11px; cursor:pointer; color:var(--muted); font-family:inherit; transition:all .15s; }
+  .btn-detail:hover { border-color:var(--blue); color:var(--blue); }
+
+  /* modal */
+  .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.4); z-index:1000; align-items:center; justify-content:center; }
+  .modal-overlay.visible { display:flex; }
+  .modal { background:#fff; border-radius:12px; width:680px; max-width:95vw; max-height:85vh; display:flex; flex-direction:column; overflow:hidden; }
+  .modal-header { padding:16px 20px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; }
+  .modal-title { font-size:15px; font-weight:700; }
+  .modal-close { width:28px; height:28px; border:none; background:none; font-size:18px; cursor:pointer; color:var(--muted); border-radius:6px; display:flex; align-items:center; justify-content:center; }
+  .modal-close:hover { background:#f0f2f7; }
+  .modal-body { padding:20px; overflow-y:auto; flex:1; font-size:13px; line-height:1.8; }
+  .modal-body h3 { font-size:13px; font-weight:700; margin:16px 0 8px; padding-bottom:5px; border-bottom:1px solid var(--border); }
+  .modal-body h3:first-child { margin-top:0; }
+  .modal-body p { margin-bottom:6px; }
+  .modal-body ul { padding-left:18px; margin-bottom:8px; }
+  .modal-body table { width:100%; border-collapse:collapse; margin-bottom:10px; font-size:12px; }
+  .modal-body th { background:var(--blue-light); color:var(--blue); padding:7px 10px; text-align:left; font-weight:600; border:1px solid #c8d8f8; }
+  .modal-body td { padding:7px 10px; border:1px solid var(--border); vertical-align:top; }
+  .modal-body tr:nth-child(even) td { background:#fafbff; }
+
+  /* loading */
+  .loading { text-align:center; padding:60px 20px; color:var(--muted); }
+  .loading .spin { width:32px; height:32px; border:3px solid var(--border); border-top-color:var(--blue); border-radius:50%; animation:spin .7s linear infinite; margin:0 auto 12px; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+
+  .empty { text-align:center; padding:60px 20px; color:var(--muted); font-size:13px; }
+  .empty .icon { font-size:36px; margin-bottom:10px; opacity:.4; }
+
+  @media (max-width:900px) {
+    .stat-grid { grid-template-columns:repeat(2,1fr); }
+    .chart-grid { grid-template-columns:1fr; }
+    .chart-card.wide { grid-column:span 1; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">📊</div>
+    <div>
+      <span class="logo-text">面试数据看板</span>
+      <span class="logo-sub">零元团队 · 五城市</span>
+    </div>
+  </div>
+  <div class="nav-links">
+    <a href="面试评价系统.html" class="nav-link">📝 新建评价</a>
+    <a href="面试数据看板.html" class="nav-link active">📊 数据看板</a>
+  </div>
+</header>
+
+<div class="dashboard">
+
+  <!-- 筛选栏 -->
+  <div class="filter-bar">
+    <div class="filter-item">
+      <label>城市</label>
+      <select id="filterCity"><option value="">全部城市</option></select>
+    </div>
+    <div class="filter-item">
+      <label>面试官</label>
+      <select id="filterInterviewer"><option value="">全部面试官</option></select>
+    </div>
+    <div class="filter-item">
+      <label>推进建议</label>
+      <select id="filterVerdict">
+        <option value="">全部</option>
+        <option value="强烈推荐进入复面">强烈推荐</option>
+        <option value="建议进入复面">建议复面</option>
+        <option value="谨慎推进">谨慎推进</option>
+        <option value="建议淘汰">建议淘汰</option>
+      </select>
+    </div>
+    <div class="filter-item">
+      <label>开始日期</label>
+      <input type="date" id="filterDateStart">
+    </div>
+    <div class="filter-item">
+      <label>结束日期</label>
+      <input type="date" id="filterDateEnd">
+    </div>
+    <button class="btn-filter" onclick="applyFilter()">🔍 筛选</button>
+    <button class="btn-reset-filter" onclick="resetFilter()">重置</button>
+  </div>
+
+  <!-- 统计卡片 -->
+  <div class="stat-grid">
+    <div class="stat-card"><div class="num" id="statTotal">—</div><div class="lbl">总面试场次</div></div>
+    <div class="stat-card green"><div class="num" id="statPass">—</div><div class="lbl">建议推进</div></div>
+    <div class="stat-card red"><div class="num" id="statFail">—</div><div class="lbl">建议淘汰</div></div>
+    <div class="stat-card amber"><div class="num" id="statAvgScore">—</div><div class="lbl">平均综合得分</div></div>
+    <div class="stat-card"><div class="num" id="statPassRate">—</div><div class="lbl">推进率</div></div>
+  </div>
+
+  <!-- 图表 -->
+  <div class="chart-grid">
+    <div class="chart-card wide">
+      <div class="chart-title">面试量趋势（按日）</div>
+      <div class="chart-wrap"><canvas id="chartTrend"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">各城市面试量</div>
+      <div class="chart-wrap"><canvas id="chartCity"></canvas></div>
+    </div>
+    <div class="chart-card wide">
+      <div class="chart-title">各维度平均得分</div>
+      <div class="chart-wrap"><canvas id="chartDimension"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">否决条件触发分布</div>
+      <div class="chart-wrap"><canvas id="chartVerdict"></canvas></div>
+    </div>
+  </div>
+
+  <!-- 明细表 -->
+  <div class="table-card">
+    <div class="table-header">
+      <div class="table-title">面试记录明细</div>
+      <span id="tableCount" style="font-size:12px;color:var(--muted)"></span>
+    </div>
+    <div id="tableWrap">
+      <div class="loading"><div class="spin"></div>加载数据中…</div>
+    </div>
+  </div>
+
+</div>
+
+<!-- 报告详情弹窗 -->
+<div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="modalTitle">面试评价报告</div>
+      <button class="modal-close" onclick="closeModalDirect()">✕</button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://zvvqsrctgpsuaivgeafv.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp2dnFzcmN0Z3BzdWFpdmdlYWZ2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2NTkxMzYsImV4cCI6MjA5NzIzNTEzNn0.WVLyUEz8cFWg7EbCaSAMuEtQ31f-1BXMek6-0PQVd78';
+
+let allData = [];
+let filtered = [];
+let charts = {};
+
+async function loadData() {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/interviews?select=*&order=created_at.desc&limit=500`, {
+      headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY }
+    });
+    allData = await res.json();
+    filtered = [...allData];
+    populateFilters();
+    render();
+  } catch(e) {
+    document.getElementById('tableWrap').innerHTML = '<div class="empty"><div class="icon">⚠️</div>数据加载失败，请刷新重试</div>';
+  }
+}
+
+function populateFilters() {
+  const cities = [...new Set(allData.map(r=>r.city).filter(Boolean))];
+  const interviewers = [...new Set(allData.map(r=>r.interviewer).filter(Boolean))];
+  const cityEl = document.getElementById('filterCity');
+  const intEl = document.getElementById('filterInterviewer');
+  cities.forEach(c => { const o=document.createElement('option'); o.value=c; o.textContent=c; cityEl.appendChild(o); });
+  interviewers.forEach(i => { const o=document.createElement('option'); o.value=i; o.textContent=i; intEl.appendChild(o); });
+}
+
+function applyFilter() {
+  const city = document.getElementById('filterCity').value;
+  const interviewer = document.getElementById('filterInterviewer').value;
+  const verdict = document.getElementById('filterVerdict').value;
+  const dateStart = document.getElementById('filterDateStart').value;
+  const dateEnd = document.getElementById('filterDateEnd').value;
+
+  filtered = allData.filter(r => {
+    if (city && r.city !== city) return false;
+    if (interviewer && r.interviewer !== interviewer) return false;
+    if (verdict && r.verdict !== verdict) return false;
+    if (dateStart && r.interview_date < dateStart) return false;
+    if (dateEnd && r.interview_date > dateEnd) return false;
+    return true;
+  });
+  render();
+}
+
+function resetFilter() {
+  document.getElementById('filterCity').value = '';
+  document.getElementById('filterInterviewer').value = '';
+  document.getElementById('filterVerdict').value = '';
+  document.getElementById('filterDateStart').value = '';
+  document.getElementById('filterDateEnd').value = '';
+  filtered = [...allData];
+  render();
+}
+
+function render() {
+  renderStats();
+  renderCharts();
+  renderTable();
+}
+
+function renderStats() {
+  const total = filtered.length;
+  const pass = filtered.filter(r => r.verdict && r.verdict !== '建议淘汰').length;
+  const fail = filtered.filter(r => r.verdict === '建议淘汰').length;
+  const avgScore = total ? Math.round(filtered.reduce((s,r)=>s+(r.score_total||0),0)/total*10)/10 : 0;
+  const passRate = total ? Math.round(pass/total*100) : 0;
+
+  document.getElementById('statTotal').textContent = total;
+  document.getElementById('statPass').textContent = pass;
+  document.getElementById('statFail').textContent = fail;
+  document.getElementById('statAvgScore').textContent = avgScore || '—';
+  document.getElementById('statPassRate').textContent = total ? passRate + '%' : '—';
+}
+
+function renderCharts() {
+  // 趋势图
+  const trendMap = {};
+  filtered.forEach(r => {
+    const d = (r.interview_date || r.created_at?.slice(0,10) || '未知');
+    trendMap[d] = (trendMap[d]||0) + 1;
+  });
+  const trendDates = Object.keys(trendMap).sort();
+  const trendVals = trendDates.map(d=>trendMap[d]);
+  renderChart('chartTrend', 'line', trendDates, trendVals, '面试场次', '#1456cb');
+
+  // 城市图
+  const cityMap = {};
+  filtered.forEach(r => { if(r.city) cityMap[r.city]=(cityMap[r.city]||0)+1; });
+  renderChart('chartCity', 'doughnut', Object.keys(cityMap), Object.values(cityMap), '场次', ['#1456cb','#27ae60','#d97706','#dc2626','#8b5cf6']);
+
+  // 维度得分
+  const dims = ['入组意愿','时间匹配','相关经验','稳定性','岗位认知'];
+  const keys = ['score_willingness','score_time','score_experience','score_stability','score_job_fit'];
+  const avgDims = keys.map(k => {
+    const vals = filtered.filter(r=>r[k]>0).map(r=>r[k]);
+    return vals.length ? Math.round(vals.reduce((a,b)=>a+b,0)/vals.length*10)/10 : 0;
+  });
+  renderChart('chartDimension', 'bar', dims, avgDims, '平均得分', '#1456cb');
+
+  // 结论分布
+  const verdictMap = {};
+  filtered.forEach(r => { if(r.verdict) verdictMap[r.verdict]=(verdictMap[r.verdict]||0)+1; });
+  renderChart('chartVerdict', 'pie', Object.keys(verdictMap), Object.values(verdictMap), '场次', ['#16a34a','#1456cb','#d97706','#dc2626']);
+}
+
+function renderChart(id, type, labels, data, label, color) {
+  if (charts[id]) charts[id].destroy();
+  const ctx = document.getElementById(id)?.getContext('2d');
+  if (!ctx) return;
+  charts[id] = new Chart(ctx, {
+    type,
+    data: {
+      labels,
+      datasets: [{
+        label,
+        data,
+        backgroundColor: Array.isArray(color) ? color.map(c=>c+'99') : color + '33',
+        borderColor: Array.isArray(color) ? color : color,
+        borderWidth: type === 'line' ? 2 : 1,
+        fill: type === 'line',
+        tension: 0.3,
+        pointRadius: type === 'line' ? 3 : 0
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: type !== 'line' && type !== 'bar', position:'right', labels:{ font:{size:11}, boxWidth:12 } } },
+      scales: (type === 'line' || type === 'bar') ? {
+        y: { beginAtZero: true, ticks: { font:{size:11} }, grid: { color:'#f0f2f7' } },
+        x: { ticks: { font:{size:10}, maxRotation:45 }, grid: { display:false } }
+      } : {}
+    }
+  });
+}
+
+function renderTable() {
+  document.getElementById('tableCount').textContent = `共 ${filtered.length} 条记录`;
+  if (!filtered.length) {
+    document.getElementById('tableWrap').innerHTML = '<div class="empty"><div class="icon">📭</div>暂无数据</div>';
+    return;
+  }
+  const rows = filtered.map(r => {
+    const verdictClass = r.verdict === '建议淘汰' ? 'fail' : r.verdict === '谨慎推进' ? 'warn' : 'pass';
+    const riskClass = r.risk_level === '高' ? 'fail' : r.risk_level === '中' ? 'warn' : 'pass';
+    return `<tr>
+      <td>${r.interview_date || '—'}</td>
+      <td><strong>${r.candidate || '—'}</strong></td>
+      <td>${r.city || '—'}</td>
+      <td>${r.interviewer || '—'}</td>
+      <td><strong>${r.score_total || '—'}</strong>/25</td>
+      <td>${r.score_willingness||'—'} / ${r.score_time||'—'} / ${r.score_experience||'—'} / ${r.score_stability||'—'} / ${r.score_job_fit||'—'}</td>
+      <td><span class="badge ${verdictClass}">${r.verdict || '—'}</span></td>
+      <td><span class="badge ${riskClass}">${r.risk_level ? r.risk_level+'风险' : '—'}</span></td>
+      <td><button class="btn-detail" onclick="showDetail('${r.id}')">查看报告</button></td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('tableWrap').innerHTML = `
+    <table>
+      <thead><tr>
+        <th>日期</th><th>候选人</th><th>城市</th><th>面试官</th>
+        <th>总分</th><th>意愿/时间/经验/稳定/岗位</th>
+        <th>推进建议</th><th>风险</th><th>操作</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
+function showDetail(id) {
+  const record = allData.find(r=>r.id===id);
+  if (!record) return;
+  document.getElementById('modalTitle').textContent = `${record.candidate || '候选人'} · ${record.city || ''} · ${record.interview_date || ''}`;
+  document.getElementById('modalBody').innerHTML = renderMarkdown(record.report_full || '暂无报告内容');
+  document.getElementById('modalOverlay').classList.add('visible');
+}
+
+function closeModal(e) { if(e.target === document.getElementById('modalOverlay')) closeModalDirect(); }
+function closeModalDirect() { document.getElementById('modalOverlay').classList.remove('visible'); }
+
+function renderMarkdown(md) {
+  return md
+    .replace(/^## (.+)$/gm,'<h3>$1</h3>')
+    .replace(/^### (.+)$/gm,'<h3>$1</h3>')
+    .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+    .replace(/((\|.+\|\n?)+)/g,block=>{
+      const lines=block.trim().split('\n').filter(l=>!/^\|[-| :]+\|$/.test(l)&&l.trim());
+      if(lines.length<2) return block;
+      const header=lines[0].split('|').filter(Boolean).map(c=>`<th>${c.trim()}</th>`).join('');
+      const rows=lines.slice(1).map(l=>'<tr>'+l.split('|').filter(Boolean).map(c=>`<td>${c.trim()}</td>`).join('')+'</tr>').join('');
+      return `<table><thead><tr>${header}</tr></thead><tbody>${rows}</tbody></table>`;
+    })
+    .replace(/^- (.+)$/gm,'<li>$1</li>')
+    .replace(/(<li>[\s\S]*?<\/li>\n?)+/g,m=>`<ul>${m}</ul>`)
+    .replace(/\n{2,}/g,'</p><p>')
+    .replace(/^(?!<[htup])(.+)$/gm,line=>line.trim()?`<p>${line}</p>`:'')
+    .replace(/<p><\/p>/g,'');
+}
+
+loadData();
+</script>
+</body>
+</html>

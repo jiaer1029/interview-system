@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI 面试评价系统 · 零元团队</title>
+<style>
+  :root {
+    --blue:#1456cb; --blue-dark:#0d3d99; --blue-light:#e8f0fe;
+    --bg:#f0f2f7; --surface:#fff; --border:#dde3f0;
+    --text:#1a1f36; --muted:#6b7280;
+    --green:#16a34a; --green-bg:#f0fdf4;
+    --red:#dc2626; --red-bg:#fef2f2;
+    --amber:#d97706; --amber-bg:#fffbeb;
+    --radius:10px;
+  }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:-apple-system,"PingFang SC","Helvetica Neue",sans-serif; background:var(--bg); color:var(--text); font-size:14px; min-height:100vh; }
+
+  header { background:var(--blue-dark); padding:0 28px; height:56px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:100; }
+  .logo { display:flex; align-items:center; gap:10px; color:#fff; }
+  .logo-icon { width:30px; height:30px; background:rgba(255,255,255,.15); border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:16px; }
+  .logo-text { font-size:15px; font-weight:700; }
+  .logo-sub { font-size:11px; opacity:.55; margin-left:4px; }
+  .nav-links { display:flex; gap:8px; }
+  .nav-link { color:rgba(255,255,255,.7); font-size:13px; font-weight:500; text-decoration:none; padding:6px 14px; border-radius:6px; transition:all .15s; }
+  .nav-link:hover { background:rgba(255,255,255,.1); color:#fff; }
+  .nav-link.active { background:rgba(255,255,255,.15); color:#fff; }
+
+  .apikey-bar { background:#fff8e1; border-bottom:1px solid #ffe082; padding:8px 24px; display:flex; align-items:center; gap:10px; font-size:12px; color:#7a5200; flex-wrap:wrap; }
+  .apikey-bar input { flex:1; max-width:320px; height:32px; border:1px solid #ffc107; border-radius:6px; padding:0 10px; font-size:12px; font-family:monospace; outline:none; background:#fff; }
+  .apikey-bar input:focus { border-color:var(--blue); }
+  .save-btn { height:32px; padding:0 14px; background:var(--blue); color:#fff; border:none; border-radius:6px; font-size:12px; font-weight:600; cursor:pointer; font-family:inherit; }
+  .key-saved { color:var(--green); font-weight:600; display:none; }
+
+  .workspace { display:grid; grid-template-columns:400px 1fr; gap:20px; padding:20px 24px; max-width:1280px; margin:0 auto; min-height:calc(100vh - 96px); }
+
+  .panel { background:var(--surface); border-radius:var(--radius); border:1px solid var(--border); display:flex; flex-direction:column; overflow:hidden; }
+  .panel-header { padding:14px 18px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; background:#fafbff; }
+  .panel-title { font-size:13px; font-weight:700; color:var(--text); display:flex; align-items:center; gap:7px; }
+  .panel-title .dot { width:7px; height:7px; border-radius:50%; background:var(--blue); }
+  .panel-body { padding:18px; flex:1; display:flex; flex-direction:column; gap:14px; overflow-y:auto; }
+
+  label { display:block; font-size:12px; font-weight:600; color:var(--text); margin-bottom:5px; }
+  .label-row { display:flex; align-items:center; justify-content:space-between; margin-bottom:5px; }
+  .required { color:var(--red); font-size:11px; font-weight:500; }
+  .optional { color:var(--muted); font-size:11px; }
+  input[type="text"] { width:100%; height:38px; border:1px solid var(--border); border-radius:7px; padding:0 12px; font-size:13px; font-family:inherit; color:var(--text); background:#fff; outline:none; transition:border-color .15s; }
+  input[type="text"]:focus { border-color:var(--blue); box-shadow:0 0 0 3px rgba(20,86,203,.08); }
+  .input-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+
+  .radio-group { display:flex; gap:8px; flex-wrap:wrap; }
+  .radio-option { flex:1; min-width:80px; }
+  .radio-option input { display:none; }
+  .radio-option label { display:flex; align-items:center; justify-content:center; padding:7px 8px; border:1.5px solid var(--border); border-radius:7px; cursor:pointer; font-size:12px; font-weight:500; color:var(--muted); transition:all .15s; text-align:center; margin:0; line-height:1.4; }
+  .radio-option input:checked + label { border-color:var(--blue); background:var(--blue-light); color:var(--blue); }
+
+  textarea { width:100%; border:1px solid var(--border); border-radius:7px; padding:10px 12px; font-size:13px; font-family:inherit; color:var(--text); resize:vertical; line-height:1.6; outline:none; transition:border-color .15s; background:#fff; min-height:180px; }
+  textarea:focus { border-color:var(--blue); box-shadow:0 0 0 3px rgba(20,86,203,.08); }
+  .field-hint { font-size:11px; color:var(--muted); margin-top:4px; line-height:1.5; }
+  .divider { border:none; border-top:1px solid var(--border); }
+
+  .btn-submit { width:100%; height:44px; background:var(--blue); color:#fff; border:none; border-radius:8px; font-size:14px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px; transition:background .15s; font-family:inherit; }
+  .btn-submit:hover { background:var(--blue-dark); }
+  .btn-submit:disabled { background:#9bb3e8; cursor:not-allowed; }
+  .spinner { width:16px; height:16px; border:2px solid rgba(255,255,255,.3); border-top-color:#fff; border-radius:50%; animation:spin .7s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+
+  .report-panel { position:sticky; top:96px; height:calc(100vh - 116px); }
+  .report-panel .panel-body { overflow-y:auto; }
+
+  .empty-state { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; padding:40px 20px; text-align:center; }
+  .empty-icon { font-size:40px; opacity:.4; }
+  .empty-title { font-size:14px; font-weight:600; color:#9ca3af; }
+  .empty-desc { font-size:12px; color:#b0b7c3; line-height:1.6; max-width:260px; }
+
+  .report-output { display:none; flex-direction:column; flex:1; }
+  .report-output.visible { display:flex; }
+  .report-meta { background:var(--blue-light); border-radius:8px; padding:12px 14px; display:flex; gap:14px; flex-wrap:wrap; margin-bottom:16px; }
+  .report-meta span { font-size:12px; color:var(--blue); font-weight:500; }
+  .report-content { font-size:13px; line-height:1.8; color:var(--text); flex:1; }
+  .report-content h3 { font-size:13px; font-weight:700; margin:18px 0 8px; padding-bottom:5px; border-bottom:1px solid var(--border); }
+  .report-content h3:first-child { margin-top:0; }
+  .report-content p { margin-bottom:6px; }
+  .report-content ul { padding-left:18px; margin-bottom:8px; }
+  .report-content li { margin-bottom:4px; }
+  .report-content table { width:100%; border-collapse:collapse; margin-bottom:10px; font-size:12px; }
+  .report-content th { background:var(--blue-light); color:var(--blue); padding:7px 10px; text-align:left; font-weight:600; border:1px solid #c8d8f8; }
+  .report-content td { padding:7px 10px; border:1px solid var(--border); vertical-align:top; }
+  .report-content tr:nth-child(even) td { background:#fafbff; }
+  .verdict-pass { display:inline-block; background:var(--green-bg); color:var(--green); padding:2px 9px; border-radius:12px; font-size:11px; font-weight:700; }
+  .verdict-fail { display:inline-block; background:var(--red-bg); color:var(--red); padding:2px 9px; border-radius:12px; font-size:11px; font-weight:700; }
+  .verdict-warn { display:inline-block; background:var(--amber-bg); color:var(--amber); padding:2px 9px; border-radius:12px; font-size:11px; font-weight:700; }
+
+  .btn-copy { display:flex; align-items:center; gap:6px; padding:6px 14px; border:1px solid var(--border); border-radius:7px; background:#fff; font-size:12px; font-weight:600; color:var(--muted); cursor:pointer; transition:all .15s; font-family:inherit; }
+  .btn-copy:hover { border-color:var(--blue); color:var(--blue); }
+  .btn-reset { display:flex; align-items:center; gap:6px; padding:6px 14px; border:1px solid var(--border); border-radius:7px; background:#fff; font-size:12px; font-weight:600; color:var(--muted); cursor:pointer; font-family:inherit; }
+  .btn-reset:hover { border-color:var(--red); color:var(--red); }
+
+  .skeleton-wrap { display:none; flex-direction:column; gap:10px; flex:1; padding-top:4px; }
+  .skeleton-wrap.visible { display:flex; }
+  .sk { background:linear-gradient(90deg,#f0f2f7 25%,#e4e7ef 50%,#f0f2f7 75%); background-size:200% 100%; animation:shimmer 1.4s infinite; border-radius:6px; }
+  .sk-title { height:16px; width:55%; }
+  .sk-line { height:12px; }
+  .sk-line.w80 { width:80%; } .sk-line.w60 { width:60%; } .sk-line.w90 { width:90%; }
+  .sk-block { height:80px; }
+  @keyframes shimmer { to { background-position:-200% 0; } }
+
+  .error-msg { background:var(--red-bg); border:1px solid #fca5a5; border-radius:8px; padding:12px 14px; font-size:13px; color:var(--red); display:none; }
+  .error-msg.visible { display:block; }
+  .success-msg { background:var(--green-bg); border:1px solid #86efac; border-radius:8px; padding:10px 14px; font-size:12px; color:var(--green); display:none; margin-top:8px; }
+  .success-msg.visible { display:block; }
+
+  @media (max-width:900px) {
+    .workspace { grid-template-columns:1fr; }
+    .report-panel { position:static; height:auto; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">🤖</div>
+    <div>
+      <span class="logo-text">AI 面试评价系统</span>
+      <span class="logo-sub">零元团队 · 内部工具</span>
+    </div>
+  </div>
+  <div class="nav-links">
+    <a href="面试评价系统.html" class="nav-link active">📝 新建评价</a>
+    <a href="面试数据看板.html" class="nav-link">📊 数据看板</a>
+  </div>
+</header>
+
+<div class="apikey-bar">
+  <span>🔑 DeepSeek API Key：</span>
+  <input type="password" id="apiKeyInput" placeholder="粘贴你的 DeepSeek API Key（sk-...）">
+  <button class="save-btn" onclick="saveKey()">保存</button>
+  <span class="key-saved" id="keySaved">✅ 已保存</span>
+  <span style="margin-left:auto;opacity:.7;font-size:11px">每场约 ¥0.1–0.2 元 · <a href="https://platform.deepseek.com" target="_blank" style="color:inherit">获取 Key</a></span>
+</div>
+
+<div class="workspace">
+  <div class="panel">
+    <div class="panel-header">
+      <div class="panel-title"><span class="dot"></span>面试信息录入</div>
+    </div>
+    <div class="panel-body">
+
+      <div class="input-row">
+        <div>
+          <div class="label-row"><label>候选人姓名</label><span class="optional">选填</span></div>
+          <input type="text" id="candidate" placeholder="例：张某某">
+        </div>
+        <div>
+          <div class="label-row"><label>面试城市</label><span class="optional">选填</span></div>
+          <input type="text" id="city" placeholder="例：西安">
+        </div>
+      </div>
+
+      <div class="input-row">
+        <div>
+          <div class="label-row"><label>面试官</label><span class="optional">选填</span></div>
+          <input type="text" id="interviewer" placeholder="例：闫莹">
+        </div>
+        <div>
+          <div class="label-row"><label>面试日期</label><span class="optional">选填</span></div>
+          <input type="text" id="idate" placeholder="例：2026-06-11">
+        </div>
+      </div>
+
+      <hr class="divider">
+
+      <div>
+        <div class="label-row"><label>口音情况</label><span class="required">招聘官判断</span></div>
+        <div class="radio-group">
+          <div class="radio-option"><input type="radio" name="accent" id="a1" value="无明显口音" checked><label for="a1">✅ 无明显口音</label></div>
+          <div class="radio-option"><input type="radio" name="accent" id="a2" value="有轻微口音但不影响理解"><label for="a2">⚠️ 轻微口音</label></div>
+          <div class="radio-option"><input type="radio" name="accent" id="a3" value="口音较重严重影响理解"><label for="a3">❌ 严重影响理解</label></div>
+        </div>
+      </div>
+
+      <div>
+        <div class="label-row"><label>结巴 / 语速情况</label><span class="required">招聘官判断</span></div>
+        <div class="radio-group">
+          <div class="radio-option"><input type="radio" name="stutter" id="s1" value="表达正常流利" checked><label for="s1">✅ 表达正常</label></div>
+          <div class="radio-option"><input type="radio" name="stutter" id="s2" value="轻微结巴但不影响沟通"><label for="s2">⚠️ 轻微结巴</label></div>
+          <div class="radio-option"><input type="radio" name="stutter" id="s3" value="严重结巴影响正常沟通"><label for="s3">❌ 严重结巴</label></div>
+        </div>
+      </div>
+
+      <hr class="divider">
+
+      <div style="flex:1;display:flex;flex-direction:column;">
+        <div class="label-row"><label>面试转写文字</label><span class="required">必填</span></div>
+        <textarea id="transcript" placeholder="将飞书妙记转写的面试文字粘贴至此处...
+
+格式示例：
+面试官：你好，请先做个自我介绍
+候选人：您好，我叫张某某，目前在..."></textarea>
+        <div class="field-hint">从飞书妙记复制转写文字后粘贴，妙记会自动区分面试官和候选人发言</div>
+      </div>
+
+      <div class="error-msg" id="errorMsg"></div>
+      <div class="success-msg" id="successMsg">✅ 报告已自动保存到数据看板</div>
+
+      <button class="btn-submit" id="submitBtn" onclick="generateReport()">
+        <span id="btnIcon">✨</span>
+        <span id="btnText">生成面试评价报告</span>
+      </button>
+
+    </div>
+  </div>
+
+  <div class="panel report-panel">
+    <div class="panel-header">
+      <div class="panel-title"><span class="dot"></span>面试评价报告</div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn-reset" id="resetBtn" onclick="resetReport()" style="display:none">🔄 重置</button>
+        <button class="btn-copy" id="copyBtn" onclick="copyReport()" style="display:none">📋 复制报告</button>
+      </div>
+    </div>
+    <div class="panel-body">
+      <div class="empty-state" id="emptyState">
+        <div class="empty-icon">📋</div>
+        <div class="empty-title">等待生成报告</div>
+        <div class="empty-desc">填写左侧面试信息并粘贴转写文字，点击生成按钮后报告将在此处显示</div>
+      </div>
+      <div class="skeleton-wrap" id="skeleton">
+        <div class="sk sk-title"></div>
+        <div class="sk sk-line w80"></div>
+        <div class="sk sk-line w60"></div>
+        <div class="sk sk-block"></div>
+        <div class="sk sk-line w90"></div>
+        <div class="sk sk-line w80"></div>
+        <div class="sk sk-block"></div>
+        <div class="sk sk-line w60"></div>
+      </div>
+      <div class="report-output" id="reportOutput">
+        <div class="report-meta" id="reportMeta"></div>
+        <div class="report-content" id="reportContent"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://zvvqsrctgpsuaivgeafv.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp2dnFzcmN0Z3BzdWFpdmdlYWZ2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2NTkxMzYsImV4cCI6MjA5NzIzNTEzNn0.WVLyUEz8cFWg7EbCaSAMuEtQ31f-1BXMek6-0PQVd78';
+
+const SYSTEM_PROMPT = `你是零元团队的专业面试评估助手。根据招聘官提供的面试信息和转写文字，按照统一标准输出结构化面试评价报告。评估必须客观、精准、有据可查——每一条判断都要能从转写文字中找到原话依据，不允许凭空推断。
+
+# 一票否决条件（优先判断）
+- 明确不想做：候选人明确表达对岗位没有意愿
+- 时间严重不足：每周可投入时间极少
+- 半年内有三考计划：明确提到考公、考研、考编任意一项且时间在6个月以内
+- 通勤超限且不搬家：通勤超过1小时且明确不搬家
+- 不接受岗位作息：明确不接受13:00–22:00上班/月休4天/加班
+- 沟通障碍：招聘官标注口音严重影响理解或结巴严重影响沟通
+
+注：通勤>1h但考虑搬家→不触发否决，风险项标注"通勤风险，待跟进"
+岗位作息"勉强接受"→不触发否决，风险项标注"岗位接受度待核实"
+
+# 六个评估维度
+【入组意愿】重点：5分主动求职动机明确；3分有意愿但模糊；1分被动应付
+【时间匹配度】重点：5分时间充裕；3分有限制但可满足；1分严重受限
+【相关经验背景】参考：5分有直接招聘销售经验；3分有可迁移经验；1分无相关经验
+【稳定性预判】重点：5分无风险动机可持续；3分轻微风险；1分明显不稳定
+【岗位认知与接受度】重点：考察是否接受13:00–22:00/日常加班1–2h/月休4天。5分充分了解明确接受；3分接受但有顾虑；1分勉强接受
+【沟通表达】门槛：直接读取招聘官填写的口音和结巴评估
+
+# 输出格式（严格遵守）
+
+## ⚠️ 一票否决检查
+表格：否决条件 | 结果(✅未触发/❌已触发) | 依据原文
+表格后一行总结：触发任意一项→ ❌ **建议淘汰**；全部未触发→ ✅ **无硬性否决**
+
+## 📊 维度评分
+表格：维度 | 得分 | 评价摘要 | 依据原文
+最后：综合得分 X/25分
+
+## 🚩 风险提示
+每条：【高/中/低风险】描述 → 建议跟进方式
+
+## 💡 综合结论
+推进建议：强烈推荐进入复面/建议进入复面/谨慎推进/建议淘汰
+亮点：2–3条
+关注点：2–3条
+给复面官的建议：1–2句
+
+重要：输出末尾必须单独一行输出以下JSON（用于数据统计，不要加markdown代码块标记）：
+SCORE_JSON:{"total":X,"willingness":X,"time":X,"experience":X,"stability":X,"job_fit":X,"verdict":"建议进入复面或建议淘汰或强烈推荐进入复面或谨慎推进","risk":"高或中或低或无"}`;
+
+let apiKey = '';
+
+function saveKey() {
+  const val = document.getElementById('apiKeyInput').value.trim();
+  if (!val.startsWith('sk-')) { alert('API Key 格式不对，应以 sk- 开头'); return; }
+  apiKey = val;
+  localStorage.setItem('ds_api_key', val);
+  document.getElementById('keySaved').style.display = 'inline';
+  document.getElementById('apiKeyInput').value = '••••••••••••••••••••';
+  setTimeout(() => document.getElementById('keySaved').style.display = 'none', 3000);
+}
+
+window.onload = () => {
+  const saved = localStorage.getItem('ds_api_key');
+  if (saved) { apiKey = saved; document.getElementById('apiKeyInput').value = '••••••••••••••••••••'; }
+};
+
+async function generateReport() {
+  if (!apiKey) { showError('请先在顶部输入并保存 API Key'); return; }
+  const transcript = document.getElementById('transcript').value.trim();
+  if (!transcript) { showError('请先粘贴面试转写文字'); return; }
+
+  const candidate   = document.getElementById('candidate').value.trim() || '未知';
+  const city        = document.getElementById('city').value.trim() || '未知';
+  const interviewer = document.getElementById('interviewer').value.trim() || '未知';
+  const date        = document.getElementById('idate').value.trim() || new Date().toISOString().slice(0,10);
+  const accent      = document.querySelector('input[name="accent"]:checked').value;
+  const stutter     = document.querySelector('input[name="stutter"]:checked').value;
+
+  hideError(); setLoading(true);
+
+  const userMsg = `候选人：${candidate}\n面试城市：${city}\n面试官：${interviewer}\n面试日期：${date}\n口音评估：${accent}\n结巴评估：${stutter}\n\n---转写文字---\n\n${transcript}`;
+
+  try {
+    const res = await fetch('https://api.deepseek.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey },
+      body: JSON.stringify({
+        model: 'deepseek-chat',
+        max_tokens: 2000,
+        messages: [{ role: 'system', content: SYSTEM_PROMPT }, { role: 'user', content: userMsg }]
+      })
+    });
+    if (!res.ok) { const e = await res.json().catch(()=>({})); throw new Error(e.error?.message || `请求失败(${res.status})`); }
+    const data = await res.json();
+    const text = data.choices?.[0]?.message?.content || '';
+    setLoading(false);
+    showReport(text, { candidate, city, interviewer, date, accent, stutter });
+    await saveToSupabase(text, { candidate, city, interviewer, date, accent, stutter });
+  } catch(e) {
+    setLoading(false);
+    showError('生成失败：' + e.message);
+  }
+}
+
+async function saveToSupabase(text, meta) {
+  try {
+    const jsonMatch = text.match(/SCORE_JSON:(\{[^}]+\})/);
+    const scores = jsonMatch ? JSON.parse(jsonMatch[1]) : {};
+    const cleanReport = text.replace(/SCORE_JSON:\{[^}]+\}/, '').trim();
+
+    await fetch(`${SUPABASE_URL}/rest/v1/interviews`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': SUPABASE_KEY,
+        'Authorization': 'Bearer ' + SUPABASE_KEY,
+        'Prefer': 'return=minimal'
+      },
+      body: JSON.stringify({
+        candidate: meta.candidate,
+        city: meta.city,
+        interviewer: meta.interviewer,
+        interview_date: meta.date,
+        accent: meta.accent,
+        stutter: meta.stutter,
+        score_total: scores.total || 0,
+        score_willingness: scores.willingness || 0,
+        score_time: scores.time || 0,
+        score_experience: scores.experience || 0,
+        score_stability: scores.stability || 0,
+        score_job_fit: scores.job_fit || 0,
+        verdict: scores.verdict || '未知',
+        risk_level: scores.risk || '未知',
+        report_full: cleanReport
+      })
+    });
+    document.getElementById('successMsg').classList.add('visible');
+    setTimeout(() => document.getElementById('successMsg').classList.remove('visible'), 4000);
+  } catch(e) { console.error('保存失败', e); }
+}
+
+function setLoading(on) {
+  const btn=document.getElementById('submitBtn'), icon=document.getElementById('btnIcon'), txt=document.getElementById('btnText');
+  const sk=document.getElementById('skeleton'), emp=document.getElementById('emptyState');
+  const out=document.getElementById('reportOutput'), copy=document.getElementById('copyBtn'), rst=document.getElementById('resetBtn');
+  if (on) {
+    btn.disabled=true; icon.innerHTML='<div class="spinner"></div>'; txt.textContent='分析中，请稍候…';
+    sk.classList.add('visible'); emp.style.display='none'; out.classList.remove('visible');
+    copy.style.display='none'; rst.style.display='none';
+  } else {
+    btn.disabled=false; icon.textContent='✨'; txt.textContent='生成面试评价报告';
+    sk.classList.remove('visible');
+  }
+}
+
+function showReport(markdown, meta) {
+  const out=document.getElementById('reportOutput'), metaEl=document.getElementById('reportMeta');
+  const contentEl=document.getElementById('reportContent'), copy=document.getElementById('copyBtn'), rst=document.getElementById('resetBtn');
+  metaEl.innerHTML=`<span>👤 <strong>${meta.candidate}</strong></span><span>🏙 <strong>${meta.city}</strong></span><span>🎙 <strong>${meta.interviewer}</strong></span><span>📅 <strong>${meta.date}</strong></span><span>🗣 ${meta.accent}</span>`;
+  const cleanText = markdown.replace(/SCORE_JSON:\{[^}]+\}/, '').trim();
+  contentEl.innerHTML = renderMarkdown(cleanText);
+  out.classList.add('visible'); copy.style.display='flex'; rst.style.display='flex';
+  copy._raw = cleanText;
+}
+
+function resetReport() {
+  document.getElementById('reportOutput').classList.remove('visible');
+  document.getElementById('emptyState').style.display='';
+  document.getElementById('copyBtn').style.display='none';
+  document.getElementById('resetBtn').style.display='none';
+  document.getElementById('transcript').value='';
+  ['candidate','city','interviewer','idate'].forEach(id => document.getElementById(id).value='');
+  document.querySelectorAll('input[name="accent"]')[0].checked=true;
+  document.querySelectorAll('input[name="stutter"]')[0].checked=true;
+}
+
+function copyReport() {
+  const btn=document.getElementById('copyBtn');
+  navigator.clipboard.writeText(btn._raw||'').then(()=>{
+    btn.textContent='✅ 已复制';
+    setTimeout(()=>{ btn.innerHTML='📋 复制报告'; },2000);
+  });
+}
+
+function renderMarkdown(md) {
+  return md
+    .replace(/^## (.+)$/gm,'<h3>$1</h3>')
+    .replace(/^### (.+)$/gm,'<h3>$1</h3>')
+    .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+    .replace(/❌\s*\*\*建议淘汰\*\*/g,'<span class="verdict-fail">❌ 建议淘汰</span>')
+    .replace(/✅\s*\*\*无硬性否决[^*]*\*\*/g,m=>`<span class="verdict-pass">${m.replace(/\*\*/g,'')}</span>`)
+    .replace(/【高风险】/g,'<span class="verdict-fail">【高风险】</span>')
+    .replace(/【中风险】/g,'<span class="verdict-warn">【中风险】</span>')
+    .replace(/【低风险】/g,'<span class="verdict-pass">【低风险】</span>')
+    .replace(/((\|.+\|\n?)+)/g,block=>{
+      const lines=block.trim().split('\n').filter(l=>!/^\|[-| :]+\|$/.test(l)&&l.trim());
+      if(lines.length<2) return block;
+      const header=lines[0].split('|').filter(Boolean).map(c=>`<th>${c.trim()}</th>`).join('');
+      const rows=lines.slice(1).map(l=>'<tr>'+l.split('|').filter(Boolean).map(c=>`<td>${c.trim()}</td>`).join('')+'</tr>').join('');
+      return `<table><thead><tr>${header}</tr></thead><tbody>${rows}</tbody></table>`;
+    })
+    .replace(/^- (.+)$/gm,'<li>$1</li>')
+    .replace(/(<li>[\s\S]*?<\/li>\n?)+/g,m=>`<ul>${m}</ul>`)
+    .replace(/\n{2,}/g,'</p><p>')
+    .replace(/^(?!<[htup])(.+)$/gm,line=>line.trim()?`<p>${line}</p>`:'')
+    .replace(/<p><\/p>/g,'');
+}
+
+function showError(msg) { const el=document.getElementById('errorMsg'); el.textContent=msg; el.classList.add('visible'); }
+function hideError() { document.getElementById('errorMsg').classList.remove('visible'); }
+</script>
+</body>
+</html>
